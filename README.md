@@ -177,7 +177,7 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D w
 
 检查工作流全部通过并验证安装包后，手动发布草稿 Release。仓库需允许客户端无需认证下载发布附件。开发构建不启用自动更新；正式构建可检查、下载并安装更新，重启前会保存正文和笔记，有冲突或保存失败时暂停安装。
 
-当前仓库发布的 `v0.1.0` 是本地构建并测试的 macOS ARM64 安装包，不经过上述签名更新流水线。签名发布工作流暂时禁用；配置完证书与更新密钥后，可在 Actions 中启用 `Draft release`。不启用自动更新的本地安装包可用 `npm run tauri -- build --ci --bundles app,dmg -- --locked` 构建，输出位于 `src-tauri/target/release/bundle/`。
+当前仓库发布的 `v0.1.0` 是本地构建并测试的 macOS ARM64 安装包，不经过上述签名更新流水线。签名发布工作流暂时禁用；配置完证书与更新密钥后，可在 Actions 中启用 `Draft release`。不启用自动更新的本地安装包可用 `APPLE_SIGNING_IDENTITY=- npm run tauri -- build --ci --bundles app,dmg -- --locked` 构建；`-` 表示为完整应用执行 ad-hoc 签名，输出位于 `src-tauri/target/release/bundle/`。
 
 ### 技术栈
 
