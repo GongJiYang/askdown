@@ -438,10 +438,7 @@ mod tests {
         let prior = entries
             .iter()
             .find(|entry| {
-                entry["source"]
-                    .as_str()
-                    .unwrap()
-                    .starts_with(".askdown/history/")
+                Path::new(entry["source"].as_str().unwrap()).starts_with(".askdown/history")
             })
             .unwrap();
         let history: serde_json::Value = serde_json::from_slice(
