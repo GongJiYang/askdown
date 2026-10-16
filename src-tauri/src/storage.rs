@@ -1,7 +1,7 @@
 //! Durable compare-and-swap saves and append-only vault history.
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
@@ -154,7 +154,7 @@ pub(super) fn history_dir(vault: &VaultPath, create: bool) -> io::Result<PathBuf
 
 pub(crate) fn sync_parent(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
-    File::open(path.parent().ok_or_else(|| invalid("缺少父目录"))?)?.sync_all()?;
+    fs::File::open(path.parent().ok_or_else(|| invalid("缺少父目录"))?)?.sync_all()?;
     // Windows NamedTempFile::persist uses atomic replace; the file itself is flushed.
     #[cfg(not(unix))]
     let _ = path;
