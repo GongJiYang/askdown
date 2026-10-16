@@ -1,11 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { viteStaticCopy } from 'vite-plugin-static-copy';
 
 // Tauri expects a fixed port and must not clear the terminal it prints Rust errors to.
 const host = process.env.TAURI_DEV_HOST;
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), viteStaticCopy({
+    targets: ['cmaps', 'standard_fonts', 'wasm', 'iccs'].map((directory) => ({
+      src: `node_modules/pdfjs-dist/${directory}/*`,
+      dest: `pdfjs/${directory}`,
+      rename: { stripBase: true },
+    })),
+  })],
   clearScreen: false,
   server: {
     port: 1420,
@@ -18,7 +25,6 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    // 桌面应用从本地加载，单个大文件没有问题
-    chunkSizeWarningLimit: 2500,
+    manifest: true,
   },
 });

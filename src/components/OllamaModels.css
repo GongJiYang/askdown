@@ -1,0 +1,11 @@
+.ollama-models { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 6px; font-size: 12.5px; min-width: 0; }
+.ollama-models .hint { margin: 0; overflow-wrap: anywhere; }
+.ollama-models-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; overflow-wrap: anywhere; }
+.ollama-model-choice { display: grid; gap: 4px; color: var(--muted); }
+.ollama-models > .btn { justify-self: start; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.ollama-models .ollama-error { color: var(--danger); }
+.ollama-download { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 10px; min-width: 0; }
+.ollama-layer { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 10px; min-width: 0; }
+.ollama-layer > span { text-align: right; }
+.ollama-layer progress { grid-column: 1 / -1; width: 100%; height: 8px; accent-color: var(--accent); }
+.ollama-layer .ollama-layer-status { grid-column: 1 / -1; text-align: left; overflow-wrap: anywhere; color: var(--muted); }

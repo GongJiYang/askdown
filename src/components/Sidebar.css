@@ -1,0 +1,15 @@
+.file-tree-tools { display: flex; justify-content: flex-end; gap: 6px; padding: 0 8px 5px; }
+.file-tree-item { min-width: 0; }
+.file-tree-row { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.file-tree .file { flex: 1; min-width: 0; flex-direction: row; align-items: center; gap: 5px; min-height: 34px; }
+.file-tree .file-folder { color: var(--muted); font-weight: 600; }
+.file-tree-chevron { width: 12px; flex-shrink: 0; }
+.file-actions-toggle { flex-shrink: 0; font-weight: 700; min-width: 28px; min-height: 30px; }
+.file-actions { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 2px 8px; }
+.file-actions .btn { padding: 4px 7px; font-size: 12px; }
+.btn.file-delete { color: var(--danger); border-color: var(--danger); }
+.file-tree-error { color: var(--danger); font-size: 12px; padding: 0 12px; overflow-wrap: anywhere; }
+.file-operation-dialog { line-height: 1.7; }
+.file-operation-dialog label { display: grid; gap: 7px; }
+.file-operation-path { font-family: var(--mono); overflow-wrap: anywhere; color: var(--muted); }
+.file-operation-dialog .modal-foot { margin-top: 20px; flex-wrap: wrap; }

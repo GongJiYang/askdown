@@ -1,6 +1,12 @@
 //! Askdown 的原生层：只负责读写本地文件和保存设置。
 //! 所有编辑、AI 调用逻辑都在前端（TypeScript）里。
 
+mod credentials;
+mod export;
+mod file_operations;
+mod storage;
+mod watch;
+
 use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -42,7 +48,10 @@ fn walk(root: &Path, dir: &Path, out: &mut Vec<FileEntry>) -> std::io::Result<()
                 .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as u64)
                 .unwrap_or(0);
-            out.push(FileEntry { path: rel, modified });
+            out.push(FileEntry {
+                path: rel,
+                modified,
+            });
         }
     }
     Ok(())
@@ -62,28 +71,58 @@ fn read_text(path: String) -> Result<String, String> {
     fs::read_to_string(&path).map_err(|e| format!("读取失败 {path}: {e}"))
 }
 
-/// 先写临时文件再重命名，避免写到一半崩溃导致文件损坏。
+/// Exact-byte compare-and-swap with durable recovery history.
 #[tauri::command]
-fn write_text(path: String, content: String) -> Result<(), String> {
-    let target = PathBuf::from(&path);
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let file_name = target
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_else(|| "file".into());
-    let tmp = target.with_file_name(format!(".{file_name}.askdown-tmp"));
-    fs::write(&tmp, content.as_bytes()).map_err(|e| format!("写入失败 {path}: {e}"))?;
-    fs::rename(&tmp, &target).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        format!("保存失败 {path}: {e}")
-    })
+fn write_text(
+    path: String,
+    root: String,
+    content: String,
+    expected: Option<String>,
+) -> Result<(), storage::SaveError> {
+    storage::write(
+        Path::new(&path),
+        Path::new(&root),
+        &content,
+        expected.as_deref(),
+    )
 }
 
 #[tauri::command]
-fn path_exists(path: String) -> bool {
-    Path::new(&path).exists()
+fn file_history(path: String, root: String) -> Result<Vec<storage::HistoryEntry>, String> {
+    storage::history(Path::new(&path), Path::new(&root)).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn read_history(path: String, root: String, id: String) -> Result<String, String> {
+    storage::read_history(Path::new(&path), Path::new(&root), &id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn snapshot_file(path: String, root: String, content: String) -> Result<(), String> {
+    storage::snapshot(Path::new(&path), Path::new(&root), &content)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn move_document(path: String, destination: String, root: String) -> Result<(), String> {
+    file_operations::move_document(Path::new(&path), Path::new(&destination), Path::new(&root))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn remove_document(path: String, root: String) -> Result<(), String> {
+    file_operations::remove_document(Path::new(&path), Path::new(&root))
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn path_exists(path: String) -> Result<bool, String> {
+    match fs::metadata(path) {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error.to_string()),
+    }
 }
 
 fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -94,32 +133,40 @@ fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 
 #[tauri::command]
 fn settings_load(app: tauri::AppHandle) -> Result<Option<String>, String> {
-    let p = settings_path(&app)?;
-    if !p.exists() {
-        return Ok(None);
-    }
-    fs::read_to_string(p).map(Some).map_err(|e| e.to_string())
+    credentials::load(&settings_path(&app)?)
 }
 
 #[tauri::command]
 fn settings_save(app: tauri::AppHandle, content: String) -> Result<(), String> {
-    let p = settings_path(&app)?;
-    write_text(p.to_string_lossy().to_string(), content)
+    credentials::save(&settings_path(&app)?, &content)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_process::init())
+        .manage(watch::Watches::default())
         .invoke_handler(tauri::generate_handler![
             list_markdown,
             read_text,
             write_text,
             path_exists,
+            file_history,
+            read_history,
+            snapshot_file,
+            move_document,
+            remove_document,
+            export::export_text,
+            watch::watch_file,
+            watch::unwatch_file,
             settings_load,
             settings_save
-        ])
-        .run(tauri::generate_context!())
-        .expect("启动 Askdown 失败");
+        ]);
+    if context.config().plugins.0.contains_key("updater") {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+    builder.run(context).expect("启动 Askdown 失败");
 }

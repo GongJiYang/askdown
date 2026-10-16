@@ -1,0 +1,26 @@
+.modal.usage-panel { width: min(1100px, 100%); }
+.usage-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.usage-vault { margin: 0 0 8px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.usage-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0 22px; }
+.usage-total { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); }
+.usage-total > span { color: var(--muted); font-size: 12px; }
+.usage-total strong { font-size: 18px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.usage-total small { color: var(--muted); line-height: 1.5; }
+.usage-table-scroll { max-height: 44vh; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.usage-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+.usage-table caption { padding: 10px 12px; color: var(--muted); text-align: left; }
+.usage-table th { position: sticky; top: 0; z-index: 1; background: var(--bg); font-weight: 600; }
+.usage-table th, .usage-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: top; }
+.usage-table tr:last-child td { border-bottom: 0; }
+.usage-table th:nth-child(-n + 3), .usage-table td:nth-child(-n + 3) { text-align: left; }
+.usage-table .usage-model { min-width: 160px; max-width: 280px; white-space: normal; overflow-wrap: anywhere; }
+.usage-model span, .usage-model strong, .usage-model small { display: block; line-height: 1.6; }
+.usage-model small { color: var(--muted); }
+.usage-foot { align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+@media (max-width: 600px) {
+  .modal.usage-panel { padding: 18px 14px; }
+  .usage-totals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .usage-total strong { font-size: 16px; }
+  .usage-table-scroll { max-height: 38vh; }
+  .usage-foot { align-items: flex-start; }
+}

@@ -8,12 +8,30 @@ export interface FileEntry {
   modified: number;
 }
 
+export interface HistoryEntry {
+  id: string;
+  created: number;
+}
+
+export class FileConflictError extends Error {
+  constructor(public readonly current: string | null) {
+    super('文件已在其他位置修改，请先处理冲突。');
+    this.name = 'FileConflictError';
+  }
+}
+
 export interface VaultFs {
   kind: 'tauri' | 'browser';
   pickFolder(): Promise<string | null>;
   list(root: string): Promise<FileEntry[]>;
   read(path: string): Promise<string>;
-  write(path: string, content: string): Promise<void>;
+  write(path: string, content: string, options: { root: string; expected: string | null }): Promise<void>;
+  move(path: string, destination: string, root: string): Promise<void>;
+  remove(path: string, root: string): Promise<void>;
+  watch(path: string, onChange: () => void, onError?: (message: string) => void): Promise<() => void>;
+  history(path: string, root: string): Promise<HistoryEntry[]>;
+  readHistory(path: string, root: string, id: string): Promise<string>;
+  snapshot(path: string, root: string, content: string): Promise<void>;
   exists(path: string): Promise<boolean>;
   loadSettings(): Promise<string | null>;
   saveSettings(content: string): Promise<void>;

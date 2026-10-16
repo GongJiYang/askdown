@@ -1,20 +1,24 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "主窗口的权限：选择文件夹，以及向模型服务发起 HTTP 请求",
+  "description": "主窗口的权限：选择文件夹、访问模型服务、导入网页与读取提问图片",
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-close",
+    "core:webview:allow-print",
+    "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
+    "process:allow-restart",
     "dialog:default",
     {
       "identifier": "http:default",
       "allow": [
         { "url": "https://*" },
         { "url": "https://*/*" },
-        { "url": "http://localhost:*" },
-        { "url": "http://localhost:*/*" },
-        { "url": "http://127.0.0.1:*" },
-        { "url": "http://127.0.0.1:*/*" }
+        { "url": "http://*" },
+        { "url": "http://*/*" }
       ]
     }
   ]

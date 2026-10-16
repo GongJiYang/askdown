@@ -1,0 +1,169 @@
+name: Draft release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+concurrency:
+  group: askdown-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    outputs:
+      tag: ${{ steps.config.outputs.tag }}
+      sha: ${{ steps.config.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate version and signing configuration
+        id: config
+        run: node scripts/release-config.mjs --preflight
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      - name: Refuse to modify a published release
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ steps.config.outputs.tag }}
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            const release = releases.find(r => r.tag_name === process.env.RELEASE_TAG);
+            if (release && !release.draft) throw new Error('This version is already published. Use a new version tag.');
+
+  checks:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.validate.outputs.sha }}
+
+  installers:
+    needs: [validate, checks]
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      # latest.json is shared by all targets. Serialize uploads to avoid lost platform entries.
+      max-parallel: 1
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: app,dmg
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bundles: app,dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          key: ${{ matrix.target }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libdbus-1-dev
+      - run: npm ci
+      - name: Generate release-only updater configuration
+        run: node scripts/release-config.mjs
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          TAURI_UPDATER_PUBLIC_KEY: ${{ vars.TAURI_UPDATER_PUBLIC_KEY }}
+      - name: Build signed installers and draft updater manifest
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ needs.validate.outputs.tag }}
+          releaseCommitish: ${{ needs.validate.outputs.sha }}
+          releaseName: Askdown ${{ needs.validate.outputs.tag }}
+          releaseBody: Draft installers. Publish only after every workflow job passes and the installers have been reviewed.
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+          assetNamePattern: '[name]_[version]_[platform]_[arch][setup][ext]'
+          args: --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config tauri.release.json -- --locked
+      - name: Verify macOS signing and notarization
+        if: runner.os == 'macOS'
+        run: node scripts/release-verify-macos.mjs
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+  verify-manifest:
+    needs: [validate, installers]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Verify all updater platforms and uploaded assets
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        with:
+          script: |
+            const releases = await github.paginate(github.rest.repos.listReleases, context.repo);
+            const release = releases.find(r => r.tag_name === process.env.RELEASE_TAG && r.draft);
+            if (!release) throw new Error('Expected a draft release.');
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, { ...context.repo, release_id: release.id });
+            const asset = assets.find(a => a.name === 'latest.json');
+            if (!asset) throw new Error('Missing latest.json.');
+            const response = await github.rest.repos.getReleaseAsset({ ...context.repo, asset_id: asset.id, headers: { accept: 'application/octet-stream' } });
+            const manifest = JSON.parse(typeof response.data === 'string' ? response.data : Buffer.from(response.data).toString('utf8'));
+            if (manifest.version.replace(/^v/, '') !== process.env.RELEASE_TAG.slice(1)) throw new Error('Updater version mismatch.');
+            for (const platform of ['linux-x86_64', 'windows-x86_64', 'darwin-aarch64', 'darwin-x86_64']) {
+              const entry = manifest.platforms?.[platform];
+              if (!entry?.signature?.trim() || !entry.url) throw new Error(`Missing signed update for ${platform}.`);
+              const expected = `https://github.com/${context.repo.owner}/${context.repo.repo}/releases/download/${process.env.RELEASE_TAG}/`;
+              if (!entry.url.startsWith(expected)) throw new Error(`Unexpected update URL for ${platform}.`);
+              const name = decodeURIComponent(entry.url.slice(expected.length));
+              if (!assets.some(a => a.name === name && a.size > 0)) throw new Error(`Missing updater asset: ${name}`);
+            }
+            core.notice('All updater platforms are present. Release remains a draft for manual review and publication.');

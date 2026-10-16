@@ -7,27 +7,43 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "license": "MIT",
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.80",
     "@ai-sdk/openai-compatible": "^3.0.69",
+    "@huggingface/tokenizers": "^0.2.0",
     "@milkdown/kit": "^7.22.3",
+    "@mozilla/readability": "^0.6.0",
     "@tauri-apps/api": "^2.12.4",
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-http": "^2.8.3",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.0",
     "ai": "^7.0.141",
+    "fflate": "^0.8.3",
+    "js-tiktoken": "^1.0.21",
+    "pdfjs-dist": "^6.4.299",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "turndown": "^7.2.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@tauri-apps/cli": "^2.12.3",
+    "@types/node": "^26.6.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
+    "@types/turndown": "^5.0.6",
     "@vitejs/plugin-react": "^6.1.2",
+    "jsdom": "^30.1.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.4",
+    "vite-plugin-static-copy": "^4.1.1",
+    "vitest": "^5.0.4"
   },
   "private": true,
   "type": "module"
